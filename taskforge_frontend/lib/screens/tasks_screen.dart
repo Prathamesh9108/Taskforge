@@ -1,0 +1,631 @@
+import 'package:flutter/material.dart';
+
+import 'task_details_screen.dart';
+import 'add_task_screen.dart';
+
+class TasksScreen extends StatefulWidget {
+  const TasksScreen({super.key});
+
+  @override
+  State<TasksScreen> createState() => _TasksScreenState();
+}
+
+class _TasksScreenState extends State<TasksScreen> {
+  final TextEditingController searchController = TextEditingController();
+
+  String selectedStatus = 'All';
+  String selectedPriority = 'All';
+  String selectedSort = 'Newest';
+
+  final List<Map<String, dynamic>> allTasks = [
+    {
+      'title': 'Create Login UI',
+      'description': 'Design the login screen',
+      'priority': 'High',
+      'status': 'To Do',
+      'dueDate': '05 Sep 2026',
+    },
+    {
+      'title': 'Registration Screen',
+      'description': 'Create registration functionality',
+      'priority': 'High',
+      'status': 'In Progress',
+      'dueDate': '06 Sep 2026',
+    },
+    {
+      'title': 'Dashboard Design',
+      'description': 'Create professional dashboard',
+      'priority': 'Medium',
+      'status': 'In Progress',
+      'dueDate': '08 Sep 2026',
+    },
+    {
+      'title': 'Splash Screen',
+      'description': 'Create application splash screen',
+      'priority': 'Low',
+      'status': 'Done',
+      'dueDate': '01 Sep 2026',
+    },
+    {
+      'title': 'Project Screen',
+      'description': 'Create project management screen',
+      'priority': 'Medium',
+      'status': 'To Do',
+      'dueDate': '10 Sep 2026',
+    },
+  ];
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get filteredTasks {
+    List<Map<String, dynamic>> result = List.from(allTasks);
+
+    // SEARCH
+    final search = searchController.text.toLowerCase().trim();
+
+    if (search.isNotEmpty) {
+      result = result.where((task) {
+        return task['title'].toString().toLowerCase().contains(search) ||
+            task['description'].toString().toLowerCase().contains(search);
+      }).toList();
+    }
+
+    // STATUS FILTER
+    if (selectedStatus != 'All') {
+      result = result
+          .where((task) => task['status'] == selectedStatus)
+          .toList();
+    }
+
+    // PRIORITY FILTER
+    if (selectedPriority != 'All') {
+      result = result
+          .where((task) => task['priority'] == selectedPriority)
+          .toList();
+    }
+
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tasks = filteredTasks;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+
+        title: const Text(
+          'Tasks',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+
+        actions: [
+          IconButton(
+            onPressed: _showFilterSheet,
+            icon: const Icon(Icons.filter_list, color: Color(0xFF334155)),
+          ),
+        ],
+      ),
+
+      body: Column(
+        children: [
+          // SEARCH
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+
+            child: TextField(
+              controller: searchController,
+
+              onChanged: (_) {
+                setState(() {});
+              },
+
+              decoration: InputDecoration(
+                hintText: 'Search tasks...',
+
+                prefixIcon: const Icon(Icons.search),
+
+                suffixIcon: searchController.text.isNotEmpty
+                    ? IconButton(
+                        onPressed: () {
+                          searchController.clear();
+                          setState(() {});
+                        },
+                        icon: const Icon(Icons.clear),
+                      )
+                    : null,
+
+                filled: true,
+
+                fillColor: Colors.white,
+
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+
+                  borderSide: const BorderSide(color: Color(0xFF2563EB)),
+                ),
+              ),
+            ),
+          ),
+
+          // FILTER CHIPS
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+
+            child: Row(
+              children: [
+                _filterChip('All', selectedStatus == 'All', () {
+                  setState(() {
+                    selectedStatus = 'All';
+                  });
+                }),
+
+                _filterChip('To Do', selectedStatus == 'To Do', () {
+                  setState(() {
+                    selectedStatus = 'To Do';
+                  });
+                }),
+
+                _filterChip('In Progress', selectedStatus == 'In Progress', () {
+                  setState(() {
+                    selectedStatus = 'In Progress';
+                  });
+                }),
+
+                _filterChip('Done', selectedStatus == 'Done', () {
+                  setState(() {
+                    selectedStatus = 'Done';
+                  });
+                }),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // RESULT COUNT + SORT
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+
+            child: Row(
+              children: [
+                Text(
+                  '${tasks.length} task${tasks.length == 1 ? '' : 's'}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+
+                const Spacer(),
+
+                PopupMenuButton<String>(
+                  initialValue: selectedSort,
+
+                  onSelected: (value) {
+                    setState(() {
+                      selectedSort = value;
+                    });
+                  },
+
+                  itemBuilder: (context) {
+                    return const [
+                      PopupMenuItem(value: 'Newest', child: Text('Newest')),
+                      PopupMenuItem(value: 'Oldest', child: Text('Oldest')),
+                      PopupMenuItem(value: 'Priority', child: Text('Priority')),
+                    ];
+                  },
+
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.sort,
+                        size: 18,
+                        color: Color(0xFF475569),
+                      ),
+
+                      const SizedBox(width: 5),
+
+                      Text(
+                        selectedSort,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 5),
+
+          // TASK LIST
+          Expanded(
+            child: tasks.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+
+                    itemCount: tasks.length,
+
+                    itemBuilder: (context, index) {
+                      return _buildTaskCard(tasks[index]);
+                    },
+                  ),
+          ),
+        ],
+      ),
+
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddTaskScreen()),
+          );
+        },
+
+        backgroundColor: const Color(0xFF2563EB),
+
+        foregroundColor: Colors.white,
+
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _filterChip(String title, bool selected, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+
+      child: ChoiceChip(
+        label: Text(title),
+
+        selected: selected,
+
+        onSelected: (_) {
+          onTap();
+        },
+
+        selectedColor: const Color(0xFFDBEAFE),
+
+        labelStyle: TextStyle(
+          color: selected ? const Color(0xFF1D4ED8) : const Color(0xFF475569),
+
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        ),
+
+        backgroundColor: Colors.white,
+
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+    );
+  }
+
+  Widget _buildTaskCard(Map<String, dynamic> task) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TaskDetailsScreen(task: task),
+          ),
+        );
+      },
+
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+
+        padding: const EdgeInsets.all(16),
+
+        decoration: BoxDecoration(
+          color: Colors.white,
+
+          borderRadius: BorderRadius.circular(16),
+
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    task['title'],
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+
+                _priorityBadge(task['priority']),
+              ],
+            ),
+
+            const SizedBox(height: 7),
+
+            Text(
+              task['description'],
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+
+            const SizedBox(height: 14),
+
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 15,
+                  color: const Color(0xFF64748B),
+                ),
+
+                const SizedBox(width: 5),
+
+                Text(
+                  task['dueDate'],
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+
+                const Spacer(),
+
+                _statusBadge(task['status']),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _priorityBadge(String priority) {
+    Color color;
+
+    if (priority == 'High') {
+      color = Colors.red;
+    } else if (priority == 'Medium') {
+      color = Colors.orange;
+    } else {
+      color = Colors.green;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(7),
+      ),
+
+      child: Text(
+        priority,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _statusBadge(String status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(7),
+      ),
+
+      child: Text(
+        status,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF475569),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+
+        children: [
+          const Icon(Icons.task_alt, size: 60, color: Color(0xFFCBD5E1)),
+
+          const SizedBox(height: 15),
+
+          const Text(
+            'No tasks found',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          const Text(
+            'Try changing your search or filters.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+
+                crossAxisAlignment: CrossAxisAlignment.start,
+
+                children: [
+                  const Text(
+                    'Filter Tasks',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    'Status',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Wrap(
+                    spacing: 8,
+
+                    children: ['All', 'To Do', 'In Progress', 'Done'].map((
+                      status,
+                    ) {
+                      return ChoiceChip(
+                        label: Text(status),
+
+                        selected: selectedStatus == status,
+
+                        onSelected: (_) {
+                          setState(() {
+                            selectedStatus = status;
+                          });
+
+                          setSheetState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    'Priority',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Wrap(
+                    spacing: 8,
+
+                    children: ['All', 'High', 'Medium', 'Low'].map((priority) {
+                      return ChoiceChip(
+                        label: Text(priority),
+
+                        selected: selectedPriority == priority,
+
+                        onSelected: (_) {
+                          setState(() {
+                            selectedPriority = priority;
+                          });
+
+                          setSheetState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+
+                      child: const Text('Apply Filters'),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          selectedStatus = 'All';
+                          selectedPriority = 'All';
+                        });
+
+                        Navigator.pop(context);
+                      },
+
+                      child: const Text('Clear Filters'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
