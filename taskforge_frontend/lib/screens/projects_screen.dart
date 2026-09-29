@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../Services/api_service.dart';
 import 'project_details_screen.dart';
 import 'create_project_screen.dart';
 
@@ -17,54 +18,52 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   // PROJECT LIST
   // =========================================================
 
-  final List<Map<String, dynamic>> projects = [
-    {
-      'id': 1,
-      'name': 'TaskForge Mobile App',
-      'description': 'Flutter task management application',
-      'tasks': 12,
-      'completed': 7,
-      'status': 'Active',
-      'priority': 'High',
-      'startDate': '01/09/2026',
-      'endDate': '30/09/2026',
-    },
-    {
-      'id': 2,
-      'name': 'Website Development',
-      'description': 'Company website development project',
-      'tasks': 8,
-      'completed': 3,
-      'status': 'Active',
-      'priority': 'Medium',
-      'startDate': '05/09/2026',
-      'endDate': '25/09/2026',
-    },
-    {
-      'id': 3,
-      'name': 'College Project',
-      'description': 'MCA final project',
-      'tasks': 15,
-      'completed': 11,
-      'status': 'Active',
-      'priority': 'High',
-      'startDate': '01/09/2026',
-      'endDate': '15/10/2026',
-    },
-    {
-      'id': 4,
-      'name': 'Portfolio Website',
-      'description': 'Personal developer portfolio',
-      'tasks': 6,
-      'completed': 6,
-      'status': 'Completed',
-      'priority': 'Low',
-      'startDate': '01/08/2026',
-      'endDate': '20/08/2026',
-    },
-  ];
+  List<Map<String, dynamic>> projects = [];
+
+  bool isLoading = true;
+  String? errorMessage;
 
   String searchText = '';
+
+  // =========================================================
+  // INIT STATE
+  // =========================================================
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProjects();
+  }
+
+  // =========================================================
+  // LOAD PROJECTS FROM SPRING BOOT API
+  // =========================================================
+
+  Future<void> _loadProjects() async {
+    try {
+      final data = await ApiService.getProjects();
+
+      if (!mounted) return;
+
+      setState(() {
+        projects = data
+            .map<Map<String, dynamic>>(
+              (project) => Map<String, dynamic>.from(project),
+            )
+            .toList();
+
+        isLoading = false;
+        errorMessage = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+        errorMessage = e.toString();
+      });
+    }
+  }
 
   // =========================================================
   // DISPOSE
@@ -89,8 +88,26 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       text: project['description']?.toString() ?? '',
     );
 
-    String selectedStatus = project['status']?.toString() ?? 'Active';
-    String selectedPriority = project['priority']?.toString() ?? 'Medium';
+    String selectedStatus = project['status']?.toString() ?? 'ACTIVE';
+
+    if (selectedStatus == 'ACTIVE') {
+      selectedStatus = 'Active';
+    } else if (selectedStatus == 'PLANNING') {
+      selectedStatus = 'Planning';
+    } else if (selectedStatus == 'ON_HOLD') {
+      selectedStatus = 'On Hold';
+    } else if (selectedStatus == 'COMPLETED') {
+      selectedStatus = 'Completed';
+    }
+
+    if (![
+      'Active',
+      'Planning',
+      'On Hold',
+      'Completed',
+    ].contains(selectedStatus)) {
+      selectedStatus = 'Active';
+    }
 
     final result = await showDialog<bool>(
       context: context,
@@ -115,7 +132,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // PROJECT NAME
                     TextField(
                       controller: nameController,
                       textCapitalization: TextCapitalization.sentences,
@@ -131,7 +147,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
                     const SizedBox(height: 15),
 
-                    // DESCRIPTION
                     TextField(
                       controller: descriptionController,
                       maxLines: 3,
@@ -148,7 +163,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
                     const SizedBox(height: 15),
 
-                    // STATUS
                     DropdownButtonFormField<String>(
                       value: selectedStatus,
                       decoration: InputDecoration(
@@ -184,40 +198,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         }
                       },
                     ),
-
-                    const SizedBox(height: 15),
-
-                    // PRIORITY
-                    DropdownButtonFormField<String>(
-                      value: selectedPriority,
-                      decoration: InputDecoration(
-                        labelText: 'Priority',
-                        prefixIcon: const Icon(Icons.priority_high_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Low', child: Text('Low')),
-                        DropdownMenuItem(
-                          value: 'Medium',
-                          child: Text('Medium'),
-                        ),
-                        DropdownMenuItem(value: 'High', child: Text('High')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() {
-                            selectedPriority = value;
-                          });
-                        }
-                      },
-                    ),
                   ],
                 ),
               ),
               actions: [
-                // CANCEL
                 TextButton(
                   onPressed: () {
                     Navigator.pop(dialogContext, false);
@@ -225,10 +209,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   child: const Text('Cancel'),
                 ),
 
-                // SAVE
                 ElevatedButton.icon(
                   onPressed: () {
                     final name = nameController.text.trim();
+
                     final description = descriptionController.text.trim();
 
                     if (name.isEmpty) {
@@ -245,7 +229,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       project['name'] = name;
                       project['description'] = description;
                       project['status'] = selectedStatus;
-                      project['priority'] = selectedPriority;
                     });
 
                     Navigator.pop(dialogContext, true);
@@ -305,7 +288,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             'This action cannot be undone.',
           ),
           actions: [
-            // CANCEL
             TextButton(
               onPressed: () {
                 Navigator.pop(dialogContext, false);
@@ -313,7 +295,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               child: const Text('Cancel'),
             ),
 
-            // DELETE
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(dialogContext, true);
@@ -393,14 +374,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-
         leading: IconButton(
           onPressed: () {
             Navigator.pop(context);
           },
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
         ),
-
         title: const Text(
           'Projects',
           style: TextStyle(
@@ -415,26 +394,18 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       // =====================================================
       body: Column(
         children: [
-          // =================================================
-          // SEARCH
-          // =================================================
-
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
             child: TextField(
               controller: searchController,
-
               onChanged: (value) {
                 setState(() {
                   searchText = value;
                 });
               },
-
               decoration: InputDecoration(
                 hintText: 'Search projects',
-
                 prefixIcon: const Icon(Icons.search),
-
                 suffixIcon: searchText.isNotEmpty
                     ? IconButton(
                         onPressed: () {
@@ -447,20 +418,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         icon: const Icon(Icons.clear),
                       )
                     : null,
-
                 filled: true,
                 fillColor: Colors.white,
-
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
                 ),
-
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                 ),
-
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: const BorderSide(
@@ -472,9 +439,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             ),
           ),
 
-          // =================================================
-          // PROJECT COUNT + NEW PROJECT
-          // =================================================
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
@@ -502,7 +466,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           // PROJECT LIST
           // =================================================
           Expanded(
-            child: filteredProjects.isEmpty
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : errorMessage != null
+                ? _errorProjects()
+                : filteredProjects.isEmpty
                 ? _emptyProjects()
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(20, 5, 20, 90),
@@ -518,7 +486,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       ),
 
       // =====================================================
-      // CREATE PROJECT BUTTON
+      // CREATE BUTTON
       // =====================================================
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openCreateProject,
@@ -540,10 +508,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     final int completed = (project['completed'] as num?)?.toInt() ?? 0;
 
     final double progress = tasks == 0
-        ? 0
-        : (completed / tasks).clamp(0.0, 1.0);
+        ? 0.0
+        : (completed / tasks).clamp(0.0, 1.0).toDouble();
 
-    final bool isCompleted = project['status'] == 'Completed';
+    final String status = project['status']?.toString() ?? 'Active';
+
+    final bool isCompleted = status.toLowerCase() == 'completed';
+
+    final String displayStatus = status == 'ACTIVE' ? 'Active' : status;
 
     return InkWell(
       onTap: () {
@@ -554,43 +526,28 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           ),
         );
       },
-
       borderRadius: BorderRadius.circular(18),
-
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
-
         padding: const EdgeInsets.all(18),
-
         decoration: BoxDecoration(
           color: Colors.white,
-
           borderRadius: BorderRadius.circular(18),
-
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
-
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-
           children: [
-            // =================================================
-            // PROJECT NAME + MENU
-            // =================================================
-
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-
               children: [
                 Container(
                   width: 50,
                   height: 50,
-
                   decoration: BoxDecoration(
                     color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(14),
                   ),
-
                   child: const Icon(
                     Icons.folder_outlined,
                     color: Color(0xFF2563EB),
@@ -603,15 +560,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-
                     children: [
                       Text(
                         project['name']?.toString() ?? 'Unnamed Project',
-
                         maxLines: 1,
-
                         overflow: TextOverflow.ellipsis,
-
                         style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
@@ -623,11 +576,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
                       Text(
                         project['description']?.toString() ?? '',
-
                         maxLines: 2,
-
                         overflow: TextOverflow.ellipsis,
-
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF64748B),
@@ -637,12 +587,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   ),
                 ),
 
-                // =================================================
-                // EDIT / DELETE MENU
-                // =================================================
                 PopupMenuButton<String>(
                   tooltip: 'Project options',
-
                   onSelected: (value) {
                     if (value == 'edit') {
                       _editProject(project);
@@ -650,7 +596,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       _deleteProject(project);
                     }
                   },
-
                   itemBuilder: (context) {
                     return const [
                       PopupMenuItem<String>(
@@ -663,7 +608,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           ],
                         ),
                       ),
-
                       PopupMenuItem<String>(
                         value: 'delete',
                         child: Row(
@@ -682,9 +626,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
             const SizedBox(height: 18),
 
-            // =================================================
-            // STATUS + TASK COUNT
-            // =================================================
             Row(
               children: [
                 Container(
@@ -692,18 +633,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     horizontal: 10,
                     vertical: 5,
                   ),
-
                   decoration: BoxDecoration(
                     color: isCompleted
                         ? Colors.green.withOpacity(0.1)
                         : const Color(0xFFEFF6FF),
-
                     borderRadius: BorderRadius.circular(8),
                   ),
-
                   child: Text(
-                    project['status']?.toString() ?? 'Active',
-
+                    displayStatus,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -718,7 +655,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
                 Text(
                   '$completed / $tasks tasks',
-
                   style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF64748B),
@@ -729,12 +665,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
             const SizedBox(height: 10),
 
-            // =================================================
-            // PROGRESS
-            // =================================================
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 7,
@@ -746,15 +678,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
             Text(
               '${(progress * 100).round()}% completed',
-
               style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
             ),
 
             const SizedBox(height: 12),
 
-            // =================================================
-            // PRIORITY + DATES
-            // =================================================
             Row(
               children: [
                 Icon(
@@ -767,7 +695,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
                 Text(
                   project['priority']?.toString() ?? 'Medium',
-
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -811,16 +738,61 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     switch (priority) {
       case 'High':
         return Colors.red;
-
       case 'Medium':
         return Colors.orange;
-
       case 'Low':
         return Colors.green;
-
       default:
         return const Color(0xFF64748B);
     }
+  }
+
+  // =========================================================
+  // ERROR
+  // =========================================================
+
+  Widget _errorProjects() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 70, color: Colors.red),
+
+            const SizedBox(height: 15),
+
+            const Text(
+              'Failed to load projects',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              errorMessage ?? 'Unknown error',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF64748B)),
+            ),
+
+            const SizedBox(height: 18),
+
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  isLoading = true;
+                  errorMessage = null;
+                });
+
+                _loadProjects();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // =========================================================
@@ -833,7 +805,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-
           children: [
             const Icon(
               Icons.folder_off_outlined,

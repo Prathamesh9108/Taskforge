@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'task_details_screen.dart';
 import 'add_task_screen.dart';
+import '../services/api_service.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -12,48 +13,68 @@ class TasksScreen extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreen> {
   final TextEditingController searchController = TextEditingController();
-
   String selectedStatus = 'All';
   String selectedPriority = 'All';
   String selectedSort = 'Newest';
 
-  final List<Map<String, dynamic>> allTasks = [
-    {
-      'title': 'Create Login UI',
-      'description': 'Design the login screen',
-      'priority': 'High',
-      'status': 'To Do',
-      'dueDate': '05 Sep 2026',
-    },
-    {
-      'title': 'Registration Screen',
-      'description': 'Create registration functionality',
-      'priority': 'High',
-      'status': 'In Progress',
-      'dueDate': '06 Sep 2026',
-    },
-    {
-      'title': 'Dashboard Design',
-      'description': 'Create professional dashboard',
-      'priority': 'Medium',
-      'status': 'In Progress',
-      'dueDate': '08 Sep 2026',
-    },
-    {
-      'title': 'Splash Screen',
-      'description': 'Create application splash screen',
-      'priority': 'Low',
-      'status': 'Done',
-      'dueDate': '01 Sep 2026',
-    },
-    {
-      'title': 'Project Screen',
-      'description': 'Create project management screen',
-      'priority': 'Medium',
-      'status': 'To Do',
-      'dueDate': '10 Sep 2026',
-    },
-  ];
+  List<Map<String, dynamic>> allTasks = [];
+  bool isLoading = true;
+  String? errorMessage;
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    try {
+      final data = await ApiService.getTasks();
+
+      setState(() {
+        allTasks = data.map<Map<String, dynamic>>((task) {
+          return {
+            'id': task['id'],
+            'title': task['title'] ?? '',
+            'description': task['description'] ?? '',
+            'priority': _formatPriority(task['priority']),
+            'status': _formatStatus(task['status']),
+            'dueDate': task['dueDate'] ?? 'No due date',
+          };
+        }).toList();
+
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorMessage = e.toString();
+      });
+    }
+  }
+
+  String _formatStatus(String? status) {
+    if (status == 'TODO') {
+      return 'To Do';
+    }
+
+    if (status == 'IN_PROGRESS') {
+      return 'In Progress';
+    }
+
+    if (status == 'DONE') {
+      return 'Done';
+    }
+
+    return status ?? 'To Do';
+  }
+
+  String _formatPriority(String? priority) {
+    if (priority == 'HIGH') return 'High';
+    if (priority == 'MEDIUM') return 'Medium';
+    if (priority == 'LOW') return 'Low';
+
+    return priority ?? 'Low';
+  }
 
   @override
   void dispose() {
@@ -270,13 +291,20 @@ class _TasksScreenState extends State<TasksScreen> {
 
           // TASK LIST
           Expanded(
-            child: tasks.isEmpty
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : errorMessage != null
+                ? Center(
+                    child: Text(
+                      'Failed to load tasks',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  )
+                : tasks.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-
                     itemCount: tasks.length,
-
                     itemBuilder: (context, index) {
                       return _buildTaskCard(tasks[index]);
                     },
@@ -286,17 +314,18 @@ class _TasksScreenState extends State<TasksScreen> {
       ),
 
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const AddTaskScreen()),
           );
+
+          if (result == true) {
+            await _loadTasks();
+          }
         },
-
         backgroundColor: const Color(0xFF2563EB),
-
         foregroundColor: Colors.white,
-
         child: const Icon(Icons.add),
       ),
     );

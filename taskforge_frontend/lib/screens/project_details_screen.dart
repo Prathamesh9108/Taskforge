@@ -167,7 +167,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> {
                     ),
 
                     Text(
-                      '${((project['progress'] as double) * 100).round()}%',
+                      '${(((project['progress'] ?? 0) as num) * 100).round()}%',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -178,6 +178,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> {
                 ),
 
                 const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: ((project['progress'] ?? 0) as num).toDouble(),
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(10),
+                ),
 
                 LinearProgressIndicator(
                   value: project['progress'],
