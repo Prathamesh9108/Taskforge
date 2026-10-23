@@ -1,4 +1,12 @@
 import 'package:flutter/material.dart';
+import '../Services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/responsive_scaffold.dart';
+import '../widgets/priority_badge.dart';
+import '../widgets/interactive_card.dart';
+import 'task_details_screen.dart';
+import 'add_task_screen.dart';
+import 'tasks_screen.dart';
 
 class KanbanBoardScreen extends StatefulWidget {
   const KanbanBoardScreen({super.key});
@@ -7,784 +15,442 @@ class KanbanBoardScreen extends StatefulWidget {
   State<KanbanBoardScreen> createState() => _KanbanBoardScreenState();
 }
 
-class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
-  // =========================================================
-  // TASK LIST
-  // =========================================================
+class _KanbanBoardScreenState extends State<KanbanBoardScreen>
+    with SingleTickerProviderStateMixin {
+  List<Map<String, dynamic>> tasks = [];
+  bool isLoading = true;
+  String searchQuery = '';
+  String filterPriority = 'All';
 
-  final List<Map<String, dynamic>> tasks = [
-    {
-      'id': 1,
-      'title': 'Create Login UI',
-      'description': 'Design login screen',
-      'priority': 'High',
-      'status': 'To Do',
-    },
-    {
-      'id': 2,
-      'title': 'Dashboard Design',
-      'description': 'Create dashboard UI',
-      'priority': 'Medium',
-      'status': 'To Do',
-    },
-    {
-      'id': 3,
-      'title': 'Registration Screen',
-      'description': 'Implement registration',
-      'priority': 'High',
-      'status': 'In Progress',
-    },
-    {
-      'id': 4,
-      'title': 'Project Screen',
-      'description': 'Design project management',
-      'priority': 'Medium',
-      'status': 'In Progress',
-    },
-    {
-      'id': 5,
-      'title': 'Splash Screen',
-      'description': 'Create application splash',
-      'priority': 'Low',
-      'status': 'Done',
-    },
-  ];
+  late TabController _tabController;
 
-  // =========================================================
-  // BUILD
-  // =========================================================
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _loadTasks();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadTasks() async {
+    try {
+      final data = await ApiService.getTasks();
+      if (!mounted) return;
+      setState(() {
+        tasks = data.map<Map<String, dynamic>>((t) {
+          final s = t['status']?.toString().toUpperCase() ?? 'TODO';
+          final displayStatus = (s == 'DONE' || s == 'COMPLETED')
+              ? 'Done'
+              : s == 'IN_PROGRESS'
+                  ? 'In Progress'
+                  : 'To Do';
+          final p = t['priority']?.toString().toUpperCase() ?? 'MEDIUM';
+          final displayPriority =
+              p == 'HIGH' ? 'High' : p == 'LOW' ? 'Low' : 'Medium';
+          return {
+            'id': t['id'],
+            'title': t['title'] ?? 'Task',
+            'description': t['description'] ?? '',
+            'status': displayStatus,
+            'priority': displayPriority,
+            'dueDate': t['dueDate'] ?? 'No due date',
+            'project': t['project']?['name'] ?? 'General',
+            'projectId': t['project']?['id'],
+          };
+        }).toList();
+        isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => isLoading = false);
+    }
+  }
+
+  void _updateTaskStatus(Map<String, dynamic> task, String newStatus) {
+    final taskId = task['id'];
+    if (taskId != null) {
+      final backendStatus = newStatus == 'Done'
+          ? 'DONE'
+          : newStatus == 'In Progress'
+              ? 'IN_PROGRESS'
+              : 'TODO';
+
+      setState(() {
+        task['status'] = newStatus;
+      });
+
+      ApiService.updateTask((taskId as num).toInt(), {
+        'status': backendStatus,
+      });
+    }
+  }
+
+  Future<void> _openAddTask({String? status}) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddTaskScreen(initialStatus: status),
+      ),
+    );
+    if (result == true && mounted) {
+      _loadTasks();
+    }
+  }
+
+  List<Map<String, dynamic>> _filteredTasks(String laneStatus) {
+    return tasks.where((t) {
+      if (t['status'] != laneStatus) return false;
+      if (filterPriority != 'All' && t['priority'] != filterPriority) return false;
+      if (searchQuery.isNotEmpty) {
+        final q = searchQuery.toLowerCase();
+        final title = (t['title'] ?? '').toString().toLowerCase();
+        final project = (t['project'] ?? '').toString().toLowerCase();
+        return title.contains(q) || project.contains(q);
+      }
+      return true;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final todoTasks = _filteredTasks('To Do');
+    final inProgressTasks = _filteredTasks('In Progress');
+    final doneTasks = _filteredTasks('Done');
 
-    final bool isDark = theme.brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-
-      // =====================================================
-      // APP BAR
-      // =====================================================
-      appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        elevation: 0,
-
-        leading: IconButton(
+    return ResponsiveScaffold(
+      selectedIndex: 2,
+      title: 'Kanban Board',
+      subtitle: '${tasks.length} total tasks',
+      onRefresh: _loadTasks,
+      topBarActions: [
+        IconButton(
+          tooltip: 'Switch to List View',
+          icon: const Icon(Icons.format_list_bulleted_rounded, size: 20, color: AppTheme.textSecondary),
           onPressed: () {
-            Navigator.pop(context);
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const TasksScreen()),
+            );
           },
-
-          icon: Icon(Icons.arrow_back, color: colors.onSurface),
         ),
-
-        title: Text(
-          'Kanban Board',
-
-          style: TextStyle(
-            color: colors.onSurface,
-            fontWeight: FontWeight.bold,
-          ),
+        IconButton(
+          tooltip: 'Add Task',
+          icon: const Icon(Icons.add_task_rounded, size: 20, color: AppTheme.primary),
+          onPressed: () => _openAddTask(),
         ),
-
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: () {
-              setState(() {});
-
-              _showMessage('Kanban board refreshed');
-            },
-
-            icon: Icon(Icons.refresh, color: colors.onSurface),
-          ),
-        ],
+      ],
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Add Task',
+        backgroundColor: AppTheme.primary,
+        foregroundColor: Colors.white,
+        elevation: 2,
+        mini: true,
+        onPressed: () => _openAddTask(),
+        child: const Icon(Icons.add, size: 20),
       ),
-
-      // =====================================================
-      // BODY
-      // =====================================================
-      body: Column(
-        children: [
-          // =================================================
-          // PROJECT HEADER
-          // =================================================
-
-          Container(
-            width: double.infinity,
-
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-
-            padding: const EdgeInsets.fromLTRB(20, 15, 20, 15),
-
-            child: Row(
-              children: [
-                // PROJECT ICON
-                Container(
-                  width: 45,
-                  height: 45,
-
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF334155)
-                        : const Color(0xFFEFF6FF),
-
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-
-                  child: const Icon(
-                    Icons.folder_outlined,
-                    color: Color(0xFF2563EB),
-                  ),
-                ),
-
-                const SizedBox(width: 12),
-
-                // PROJECT INFORMATION
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-
-                    children: [
-                      Text(
-                        'TaskForge Mobile App',
-
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-
-                          color: colors.onSurface,
-                        ),
-                      ),
-
-                      const SizedBox(height: 3),
-
-                      Text(
-                        'Project Task Board',
-
-                        style: TextStyle(
-                          fontSize: 12,
-
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 15),
-
-          // =================================================
-          // KANBAN BOARD
-          // =================================================
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
+      body: RefreshIndicator(
+        onRefresh: _loadTasks,
+        color: AppTheme.primary,
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+            : Column(
                 children: [
-                  _buildColumn('To Do'),
+                  // Filter bar
+                  Container(
+                    color: AppTheme.surface,
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 36,
+                            child: TextField(
+                              onChanged: (val) => setState(() => searchQuery = val),
+                              style: const TextStyle(fontSize: 12.5),
+                              decoration: InputDecoration(
+                                hintText: 'Search tasks...',
+                                prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.textMuted),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                fillColor: AppTheme.background,
+                                filled: true,
+                                border: OutlineInputBorder(
+                                  borderRadius: AppTheme.radiusSm,
+                                  borderSide: const BorderSide(color: AppTheme.cardBorder),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: AppTheme.radiusSm,
+                                  borderSide: const BorderSide(color: AppTheme.cardBorder),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Priority dropdown
+                        Container(
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.background,
+                            borderRadius: AppTheme.radiusSm,
+                            border: Border.all(color: AppTheme.cardBorder),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: filterPriority,
+                              style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary),
+                              icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: AppTheme.textMuted),
+                              items: const [
+                                DropdownMenuItem(value: 'All', child: Text('All')),
+                                DropdownMenuItem(value: 'High', child: Text('High')),
+                                DropdownMenuItem(value: 'Medium', child: Text('Medium')),
+                                DropdownMenuItem(value: 'Low', child: Text('Low')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) setState(() => filterPriority = val);
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                  const SizedBox(width: 12),
+                  // If mobile, render tab bar for smooth navigation between lanes
+                  if (isMobile) ...[
+                    Container(
+                      color: AppTheme.surface,
+                      child: TabBar(
+                        controller: _tabController,
+                        indicatorColor: AppTheme.primary,
+                        indicatorWeight: 2.5,
+                        labelColor: AppTheme.primary,
+                        unselectedLabelColor: AppTheme.textSecondary,
+                        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                        unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                        tabs: [
+                          Tab(text: 'To Do (${todoTasks.length})'),
+                          Tab(text: 'In Progress (${inProgressTasks.length})'),
+                          Tab(text: 'Done (${doneTasks.length})'),
+                        ],
+                      ),
+                    ),
+                  ],
 
-                  _buildColumn('In Progress'),
+                  const Divider(height: 1),
 
-                  const SizedBox(width: 12),
-
-                  _buildColumn('Done'),
+                  // Content: TabBarView on mobile, multi-column row on tablet/desktop
+                  Expanded(
+                    child: isMobile
+                        ? TabBarView(
+                            controller: _tabController,
+                            children: [
+                              _buildLaneList('To Do', todoTasks, const Color(0xFF64748B)),
+                              _buildLaneList('In Progress', inProgressTasks, AppTheme.primary),
+                              _buildLaneList('Done', doneTasks, AppTheme.success),
+                            ],
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.all(AppTheme.space16),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: _buildDesktopLane('To Do', todoTasks, const Color(0xFF64748B))),
+                                const SizedBox(width: 12),
+                                Expanded(child: _buildDesktopLane('In Progress', inProgressTasks, AppTheme.primary)),
+                                const SizedBox(width: 12),
+                                Expanded(child: _buildDesktopLane('Done', doneTasks, AppTheme.success)),
+                              ],
+                            ),
+                          ),
+                  ),
                 ],
               ),
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  // =========================================================
-  // COLUMN
-  // =========================================================
-
-  Widget _buildColumn(String status) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    final bool isDark = theme.brightness == Brightness.dark;
-
-    final columnTasks = tasks
-        .where((task) => task['status'] == status)
-        .toList();
-
-    return DragTarget<Map<String, dynamic>>(
-      onWillAcceptWithDetails: (details) {
-        return true;
-      },
-
-      onAcceptWithDetails: (details) {
-        setState(() {
-          details.data['status'] = status;
-        });
-
-        _showMessage('Task moved to $status');
-      },
-
-      builder: (context, candidateData, rejectedData) {
-        final bool isDraggingOver = candidateData.isNotEmpty;
-
-        return Container(
-          width: 285,
-
-          constraints: const BoxConstraints(minHeight: 500),
-
-          padding: const EdgeInsets.all(12),
-
-          decoration: BoxDecoration(
-            color: isDraggingOver
-                ? (isDark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF))
-                : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
-
-            borderRadius: BorderRadius.circular(18),
-
-            border: Border.all(
-              color: isDraggingOver
-                  ? const Color(0xFF2563EB)
-                  : (isDark
-                        ? const Color(0xFF334155)
-                        : const Color(0xFFE2E8F0)),
-            ),
-          ),
-
+  Widget _buildLaneList(String title, List<Map<String, dynamic>> laneTasks, Color accentColor) {
+    if (laneTasks.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // =================================================
-              // COLUMN HEADER
-              // =================================================
-
-              Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _statusColor(status),
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  Text(
-                    status,
-
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-
-                      color: colors.onSurface,
-                    ),
-                  ),
-
-                  const Spacer(),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF334155) : Colors.white,
-
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-
-                    child: Text(
-                      '${columnTasks.length}',
-
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
+              Icon(Icons.inbox_rounded, size: 40, color: AppTheme.textMuted.withValues(alpha: 0.5)),
+              const SizedBox(height: 8),
+              Text(
+                'No tasks in $title',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
               ),
-
-              const SizedBox(height: 15),
-
-              // =================================================
-              // TASKS
-              // =================================================
-              if (columnTasks.isEmpty)
-                _emptyColumn()
-              else
-                ...columnTasks.map((task) => _buildTaskCard(task)),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => _openAddTask(status: title),
+                icon: const Icon(Icons.add, size: 14),
+                label: const Text('Add Task'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+              ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  // =========================================================
-  // TASK CARD
-  // =========================================================
-
-  Widget _buildTaskCard(Map<String, dynamic> task) {
-    return LongPressDraggable<Map<String, dynamic>>(
-      data: task,
-
-      feedback: Material(
-        color: Colors.transparent,
-
-        child: SizedBox(
-          width: 260,
-
-          child: _taskCardContent(task, dragging: true),
         ),
-      ),
+      );
+    }
 
-      childWhenDragging: Opacity(opacity: 0.3, child: _taskCardContent(task)),
-
-      child: GestureDetector(
-        onTap: () {
-          _showTaskOptions(task);
-        },
-
-        child: _taskCardContent(task),
-      ),
+    return ListView.separated(
+      padding: const EdgeInsets.all(AppTheme.space14),
+      itemCount: laneTasks.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 8),
+      itemBuilder: (context, index) => _buildCard(laneTasks[index]),
     );
   }
 
-  // =========================================================
-  // TASK CARD CONTENT
-  // =========================================================
-
-  Widget _taskCardContent(Map<String, dynamic> task, {bool dragging = false}) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    final bool isDark = theme.brightness == Brightness.dark;
-
-    final String priority = task['priority'] ?? 'Medium';
-
+  Widget _buildDesktopLane(String title, List<Map<String, dynamic>> laneTasks, Color accentColor) {
     return Container(
-      width: double.infinity,
-
-      margin: const EdgeInsets.only(bottom: 10),
-
-      padding: const EdgeInsets.all(14),
-
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : Colors.white,
-
-        borderRadius: BorderRadius.circular(14),
-
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
-
-        boxShadow: dragging
-            ? const [
-                BoxShadow(
-                  blurRadius: 10,
-                  offset: Offset(0, 5),
-                  color: Colors.black26,
-                ),
-              ]
-            : null,
+        color: AppTheme.surfaceSubtle.withValues(alpha: 0.6),
+        borderRadius: AppTheme.radiusLg,
+        border: Border.all(color: AppTheme.cardBorder),
       ),
-
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-
         children: [
-          // =================================================
-          // TITLE
-          // =================================================
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(width: 7, height: 7, decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.cardBorder),
+                    ),
+                    child: Text(
+                      '${laneTasks.length}',
+                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppTheme.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: () => _openAddTask(status: title),
+                borderRadius: AppTheme.radiusSm,
+                child: const Padding(
+                  padding: EdgeInsets.all(3),
+                  child: Icon(Icons.add, size: 16, color: AppTheme.textSecondary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: laneTasks.isEmpty
+                ? Center(
+                    child: Text('No tasks', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                  )
+                : ListView.separated(
+                    itemCount: laneTasks.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) => _buildCard(laneTasks[index]),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildCard(Map<String, dynamic> task) {
+    return InteractiveCard(
+      padding: const EdgeInsets.all(12),
+      borderRadius: AppTheme.radiusMd,
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TaskDetailsScreen(task: task),
+          ),
+        );
+        _loadTasks();
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              PriorityBadge(priority: task['priority'] ?? 'Medium', fontSize: 10),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_horiz, size: 16, color: AppTheme.textMuted),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 110),
+                onSelected: (newStatus) => _updateTaskStatus(task, newStatus),
+                itemBuilder: (context) => [
+                  if (task['status'] != 'To Do')
+                    const PopupMenuItem(value: 'To Do', height: 32, child: Text('Move to To Do', style: TextStyle(fontSize: 12))),
+                  if (task['status'] != 'In Progress')
+                    const PopupMenuItem(value: 'In Progress', height: 32, child: Text('Move to In Progress', style: TextStyle(fontSize: 12))),
+                  if (task['status'] != 'Done')
+                    const PopupMenuItem(value: 'Done', height: 32, child: Text('Move to Done', style: TextStyle(fontSize: 12))),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            task['title'] ?? 'Task',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+              letterSpacing: -0.1,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
+              const Icon(Icons.folder_outlined, size: 11, color: AppTheme.textMuted),
+              const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  task['title'].toString(),
-
-                  maxLines: 2,
-
+                  task['project'] ?? 'General',
+                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                   overflow: TextOverflow.ellipsis,
-
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-
-                    color: colors.onSurface,
-                  ),
                 ),
               ),
-
-              Icon(
-                Icons.drag_indicator,
-                size: 18,
-
-                color: colors.onSurfaceVariant,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 7),
-
-          // =================================================
-          // DESCRIPTION
-          // =================================================
-          Text(
-            task['description'].toString(),
-
-            maxLines: 2,
-
-            overflow: TextOverflow.ellipsis,
-
-            style: TextStyle(
-              fontSize: 12,
-
-              color: colors.onSurfaceVariant,
-
-              height: 1.4,
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // =================================================
-          // PRIORITY
-          // =================================================
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-
-                decoration: BoxDecoration(
-                  color: _priorityColor(priority).withOpacity(0.1),
-
-                  borderRadius: BorderRadius.circular(6),
+              if (task['dueDate'] != null && task['dueDate'] != 'No due date') ...[
+                const SizedBox(width: 4),
+                Text(
+                  task['dueDate'],
+                  style: const TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
                 ),
-
-                child: Text(
-                  priority,
-
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-
-                    color: _priorityColor(priority),
-                  ),
-                ),
-              ),
-
-              const Spacer(),
-
-              Icon(Icons.more_horiz, size: 18, color: colors.onSurfaceVariant),
+              ],
             ],
           ),
         ],
       ),
     );
-  }
-
-  // =========================================================
-  // EMPTY COLUMN
-  // =========================================================
-
-  Widget _emptyColumn() {
-    final colors = Theme.of(context).colorScheme;
-
-    return Container(
-      width: double.infinity,
-
-      padding: const EdgeInsets.symmetric(vertical: 40),
-
-      child: Column(
-        children: [
-          Icon(Icons.inbox_outlined, size: 35, color: colors.onSurfaceVariant),
-
-          const SizedBox(height: 8),
-
-          Text(
-            'No tasks',
-
-            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // =========================================================
-  // TASK OPTIONS
-  // =========================================================
-
-  void _showTaskOptions(Map<String, dynamic> task) {
-    showModalBottomSheet(
-      context: context,
-
-      backgroundColor: Theme.of(context).colorScheme.surface,
-
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-
-      builder: (sheetContext) {
-        final colors = Theme.of(sheetContext).colorScheme;
-
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-
-            children: [
-              // =================================================
-              // MOVE TASK
-              // =================================================
-
-              ListTile(
-                leading: Icon(Icons.arrow_forward, color: colors.primary),
-
-                title: Text(
-                  'Move Task',
-                  style: TextStyle(color: colors.onSurface),
-                ),
-
-                onTap: () {
-                  Navigator.pop(sheetContext);
-
-                  _moveTask(task);
-                },
-              ),
-
-              // =================================================
-              // TASK DETAILS
-              // =================================================
-              ListTile(
-                leading: Icon(Icons.info_outline, color: colors.primary),
-
-                title: Text(
-                  'Task Details',
-                  style: TextStyle(color: colors.onSurface),
-                ),
-
-                onTap: () {
-                  Navigator.pop(sheetContext);
-
-                  _showTaskDetails(task);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // =========================================================
-  // TASK DETAILS
-  // =========================================================
-
-  void _showTaskDetails(Map<String, dynamic> task) {
-    final colors = Theme.of(context).colorScheme;
-
-    showDialog(
-      context: context,
-
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(
-            task['title'].toString(),
-
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-
-            crossAxisAlignment: CrossAxisAlignment.start,
-
-            children: [
-              Text(task['description'].toString()),
-
-              const SizedBox(height: 15),
-
-              Text('Priority: ${task['priority']}'),
-
-              const SizedBox(height: 8),
-
-              Text('Status: ${task['status']}'),
-            ],
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-
-              child: Text('Close', style: TextStyle(color: colors.primary)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // =========================================================
-  // MOVE TASK
-  // =========================================================
-
-  void _moveTask(Map<String, dynamic> task) {
-    showModalBottomSheet(
-      context: context,
-
-      backgroundColor: Theme.of(context).colorScheme.surface,
-
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-
-      builder: (sheetContext) {
-        final colors = Theme.of(sheetContext).colorScheme;
-
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-
-            children: [
-              // =================================================
-              // TITLE
-              // =================================================
-
-              Padding(
-                padding: const EdgeInsets.all(18),
-
-                child: Text(
-                  'Move Task To',
-
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-
-                    color: colors.onSurface,
-                  ),
-                ),
-              ),
-
-              // =================================================
-              // TO DO
-              // =================================================
-              ListTile(
-                leading: const Icon(Icons.radio_button_unchecked),
-
-                title: const Text('To Do'),
-
-                onTap: () {
-                  _changeStatus(task, 'To Do');
-                },
-              ),
-
-              // =================================================
-              // IN PROGRESS
-              // =================================================
-              ListTile(
-                leading: const Icon(Icons.timelapse),
-
-                title: const Text('In Progress'),
-
-                onTap: () {
-                  _changeStatus(task, 'In Progress');
-                },
-              ),
-
-              // =================================================
-              // DONE
-              // =================================================
-              ListTile(
-                leading: const Icon(Icons.check_circle_outline),
-
-                title: const Text('Done'),
-
-                onTap: () {
-                  _changeStatus(task, 'Done');
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // =========================================================
-  // CHANGE STATUS
-  // =========================================================
-
-  void _changeStatus(Map<String, dynamic> task, String status) {
-    setState(() {
-      task['status'] = status;
-    });
-
-    Navigator.pop(context);
-
-    _showMessage('Task moved to $status');
-  }
-
-  // =========================================================
-  // MESSAGE
-  // =========================================================
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 1)),
-    );
-  }
-
-  // =========================================================
-  // STATUS COLOR
-  // =========================================================
-
-  Color _statusColor(String status) {
-    if (status == 'To Do') {
-      return Colors.grey;
-    }
-
-    if (status == 'In Progress') {
-      return Colors.blue;
-    }
-
-    return Colors.green;
-  }
-
-  // =========================================================
-  // PRIORITY COLOR
-  // =========================================================
-
-  Color _priorityColor(String priority) {
-    if (priority == 'High') {
-      return Colors.red;
-    }
-
-    if (priority == 'Low') {
-      return Colors.green;
-    }
-
-    return Colors.orange;
   }
 }

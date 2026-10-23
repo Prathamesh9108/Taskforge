@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import '../main.dart';
+import '../theme/app_theme.dart';
+import '../widgets/responsive_scaffold.dart';
+import '../widgets/interactive_card.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -9,887 +14,508 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool notificationsEnabled = true;
-  bool darkModeEnabled = false;
+  late bool darkModeEnabled;
 
-  // Local profile information
-  String userName = 'TaskForge User';
-  String userEmail = 'user@example.com';
+  @override
+  void initState() {
+    super.initState();
+    darkModeEnabled = ThemeController.isDarkMode.value;
+  }
 
-  // Local password for demo/frontend use
-  String currentPassword = '123456';
+  String userName = 'Alex Morgan';
+  String userEmail = 'alex@taskforge.io';
+  String currentPassword = '••••••••';
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: darkModeEnabled
-          ? const Color(0xFF0F172A)
-          : const Color(0xFFF8FAFC),
+    final content = SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.space16,
+        vertical: AppTheme.space16,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // User Card
+              Container(
+                padding: const EdgeInsets.all(AppTheme.space16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: AppTheme.radiusLg,
+                  border: Border.all(color: AppTheme.cardBorder),
+                  boxShadow: AppTheme.cardShadow,
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppTheme.primaryLight,
+                      child: const Text(
+                        'AM',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userName,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            userEmail,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlinedButton(
+                      onPressed: _openProfileDialog,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 30),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                      ),
+                      child: const Text('Edit'),
+                    ),
+                  ],
+                ),
+              ),
 
-      // =====================================================
-      // APP BAR
-      // =====================================================
-      appBar: AppBar(
-        backgroundColor: darkModeEnabled
-            ? const Color(0xFF1E293B)
-            : Colors.white,
-        elevation: 0,
+              const SizedBox(height: 20),
 
-        leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: Icon(
-            Icons.arrow_back,
-            color: darkModeEnabled ? Colors.white : const Color(0xFF0F172A),
-          ),
-        ),
+              // Section: Account
+              _sectionHeader('ACCOUNT'),
+              const SizedBox(height: 8),
 
-        title: Text(
-          'Settings',
-          style: TextStyle(
-            color: darkModeEnabled ? Colors.white : const Color(0xFF0F172A),
-            fontWeight: FontWeight.bold,
+              InteractiveCard(
+                onTap: _openChangePasswordDialog,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                borderRadius: AppTheme.radiusMd,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceSubtle,
+                        borderRadius: AppTheme.radiusSm,
+                      ),
+                      child: const Icon(Icons.lock_outline_rounded, size: 17, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Password & Security',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Change account password',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.textMuted),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Section: Preferences
+              _sectionHeader('PREFERENCES'),
+              const SizedBox(height: 8),
+
+              Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: AppTheme.radiusLg,
+                  border: Border.all(color: AppTheme.cardBorder),
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceSubtle,
+                              borderRadius: AppTheme.radiusSm,
+                            ),
+                            child: const Icon(Icons.notifications_none_rounded, size: 18, color: AppTheme.textSecondary),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Push Notifications',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Task reminders and updates',
+                                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: notificationsEnabled,
+                            activeTrackColor: AppTheme.primary,
+                            onChanged: (val) {
+                              setState(() => notificationsEnabled = val);
+                              _showMessage(val ? 'Notifications enabled' : 'Notifications disabled');
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceSubtle,
+                              borderRadius: AppTheme.radiusSm,
+                            ),
+                            child: const Icon(Icons.dark_mode_outlined, size: 18, color: AppTheme.textSecondary),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Dark Mode',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Toggle dark theme',
+                                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: darkModeEnabled,
+                            activeTrackColor: AppTheme.primary,
+                            onChanged: (val) {
+                              setState(() => darkModeEnabled = val);
+                              ThemeController.isDarkMode.value = val;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Section: System & Support
+              _sectionHeader('SUPPORT & ABOUT'),
+              const SizedBox(height: 8),
+
+              InteractiveCard(
+                onTap: _showHelpDialog,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                borderRadius: AppTheme.radiusMd,
+                child: const Row(
+                  children: [
+                    Icon(Icons.help_outline_rounded, size: 18, color: AppTheme.textSecondary),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Help & Documentation',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                      ),
+                    ),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.textMuted),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              InteractiveCard(
+                onTap: _showAboutDialog,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                borderRadius: AppTheme.radiusMd,
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 18, color: AppTheme.textSecondary),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'About TaskForge (v1.0.0)',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                      ),
+                    ),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.textMuted),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              // Logout Button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _showLogoutDialog,
+                  icon: const Icon(Icons.logout_rounded, size: 16, color: AppTheme.danger),
+                  label: const Text('Log Out', style: TextStyle(color: AppTheme.danger)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppTheme.dangerBorder),
+                    minimumSize: const Size(0, 42),
+                    shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusMd),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 30),
+            ],
           ),
         ),
       ),
+    );
 
-      // =====================================================
-      // BODY
-      // =====================================================
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+    return ResponsiveScaffold(
+      selectedIndex: 3,
+      title: 'Settings',
+      subtitle: 'Preferences & account',
+      body: content,
+    );
+  }
 
-        child: Column(
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          color: AppTheme.textMuted,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openProfileDialog() async {
+    final nameCtrl = TextEditingController(text: userName);
+    final emailCtrl = TextEditingController(text: userEmail);
+
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusLg),
+        title: const Text('Edit Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-
           children: [
-            // =================================================
-            // ACCOUNT
-            // =================================================
-
-            _sectionTitle('Account'),
-
+            const Text('Full Name', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            TextField(controller: nameCtrl, style: const TextStyle(fontSize: 13)),
             const SizedBox(height: 12),
-
-            // PROFILE
-            _settingsCard(
-              icon: Icons.person_outline,
-              title: 'Profile',
-              subtitle: '$userName\n$userEmail',
-              onTap: _openProfileDialog,
-            ),
-
-            const SizedBox(height: 12),
-
-            // CHANGE PASSWORD
-            _settingsCard(
-              icon: Icons.lock_outline,
-              title: 'Change Password',
-              subtitle: 'Update your password',
-              onTap: _openChangePasswordDialog,
-            ),
-
-            const SizedBox(height: 25),
-
-            // =================================================
-            // PREFERENCES
-            // =================================================
-            _sectionTitle('Preferences'),
-
-            const SizedBox(height: 12),
-
-            // NOTIFICATIONS
-            _switchCard(
-              icon: Icons.notifications_outlined,
-              title: 'Notifications',
-              subtitle: notificationsEnabled
-                  ? 'Notifications enabled'
-                  : 'Notifications disabled',
-              value: notificationsEnabled,
-              onChanged: (value) {
-                setState(() {
-                  notificationsEnabled = value;
-                });
-
-                _showMessage(
-                  value ? 'Notifications enabled' : 'Notifications disabled',
-                );
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            // DARK MODE
-            _switchCard(
-              icon: Icons.dark_mode_outlined,
-              title: 'Dark Mode',
-              subtitle: darkModeEnabled ? 'Dark mode enabled' : 'Light mode',
-              value: darkModeEnabled,
-              onChanged: (value) {
-                setState(() {
-                  darkModeEnabled = value;
-                });
-
-                _showMessage(
-                  value ? 'Dark mode enabled' : 'Light mode enabled',
-                );
-              },
-            ),
-
-            const SizedBox(height: 25),
-
-            // =================================================
-            // ABOUT
-            // =================================================
-            _sectionTitle('About'),
-
-            const SizedBox(height: 12),
-
-            // ABOUT TASKFORGE
-            _settingsCard(
-              icon: Icons.info_outline,
-              title: 'About TaskForge',
-              subtitle: 'Version 1.0.0',
-              onTap: _showAboutDialog,
-            ),
-
-            const SizedBox(height: 12),
-
-            // HELP
-            _settingsCard(
-              icon: Icons.help_outline,
-              title: 'Help & Support',
-              subtitle: 'Get help and support',
-              onTap: _showHelpDialog,
-            ),
-
-            const SizedBox(height: 25),
-
-            // =================================================
-            // LOGOUT
-            // =================================================
-            SizedBox(
-              width: double.infinity,
-
-              child: ElevatedButton.icon(
-                onPressed: _showLogoutDialog,
-
-                icon: const Icon(Icons.logout),
-
-                label: const Text(
-                  'Logout',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 30),
+            const Text('Email Address', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            TextField(controller: emailCtrl, style: const TextStyle(fontSize: 13)),
           ],
         ),
-      ),
-    );
-  }
-
-  // =========================================================
-  // SECTION TITLE
-  // =========================================================
-
-  Widget _sectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: darkModeEnabled ? Colors.white : const Color(0xFF0F172A),
-      ),
-    );
-  }
-
-  // =========================================================
-  // SETTINGS CARD
-  // =========================================================
-
-  Widget _settingsCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-
-      borderRadius: BorderRadius.circular(16),
-
-      child: Container(
-        padding: const EdgeInsets.all(16),
-
-        decoration: BoxDecoration(
-          color: darkModeEnabled ? const Color(0xFF1E293B) : Colors.white,
-
-          borderRadius: BorderRadius.circular(16),
-
-          border: Border.all(
-            color: darkModeEnabled
-                ? const Color(0xFF334155)
-                : const Color(0xFFE2E8F0),
+        actions: [
+          OutlinedButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white),
+            child: const Text('Save'),
           ),
-        ),
+        ],
+      ),
+    );
 
-        child: Row(
+    if (res == true && mounted) {
+      setState(() {
+        userName = nameCtrl.text.trim();
+        userEmail = emailCtrl.text.trim();
+      });
+      _showMessage('Profile updated successfully');
+    }
+  }
+
+  Future<void> _openChangePasswordDialog() async {
+    final oldCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusLg),
+        title: const Text('Change Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 40,
-              height: 40,
+            const Text('Current Password', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            TextField(controller: oldCtrl, obscureText: true, style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 12),
+            const Text('New Password', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            TextField(controller: newCtrl, obscureText: true, style: const TextStyle(fontSize: 13)),
+          ],
+        ),
+        actions: [
+          OutlinedButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white),
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
 
-              decoration: BoxDecoration(
-                color: darkModeEnabled
-                    ? const Color(0xFF334155)
-                    : const Color(0xFFF1F5F9),
+    if (res == true && mounted) {
+      _showMessage('Password updated successfully');
+    }
+  }
 
-                borderRadius: BorderRadius.circular(10),
-              ),
-
-              child: Icon(
-                icon,
-                size: 20,
-                color: darkModeEnabled ? Colors.white : const Color(0xFF475569),
-              ),
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusLg),
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline_rounded, color: AppTheme.primary, size: 20),
+            SizedBox(width: 8),
+            Text('Help & Support', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'TaskForge Quick Guide:',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
             ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-                  Text(
-                    title,
-
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: darkModeEnabled
-                          ? Colors.white
-                          : const Color(0xFF0F172A),
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  Text(
-                    subtitle,
-
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: darkModeEnabled
-                          ? const Color(0xFFCBD5E1)
-                          : const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 15,
-              color: darkModeEnabled
-                  ? const Color(0xFF94A3B8)
-                  : const Color(0xFF94A3B8),
+            SizedBox(height: 8),
+            Text(
+              '• Projects: Group related tasks and track delivery milestones.\n'
+              '• Tasks: Create action items, assign priorities, and log progress.\n'
+              '• Kanban: Visualize sprint lanes with smooth lane switching.\n'
+              '• Offline Mode: All actions auto-sync with Spring Boot backend when online.',
+              style: TextStyle(fontSize: 12, height: 1.4, color: AppTheme.textSecondary),
             ),
           ],
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
+        ],
       ),
     );
   }
 
-  // =========================================================
-  // SWITCH CARD
-  // =========================================================
-
-  Widget _switchCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-
-      decoration: BoxDecoration(
-        color: darkModeEnabled ? const Color(0xFF1E293B) : Colors.white,
-
-        borderRadius: BorderRadius.circular(16),
-
-        border: Border.all(
-          color: darkModeEnabled
-              ? const Color(0xFF334155)
-              : const Color(0xFFE2E8F0),
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusLg),
+        title: const Text('About TaskForge', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('TaskForge Mobile Client', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            SizedBox(height: 4),
+            Text('Version 1.0.0 (Production Build)', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            SizedBox(height: 8),
+            Text('Cross-platform Flutter application with Spring Boot REST API integration.', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+          ],
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
       ),
+    );
+  }
 
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-
-            decoration: BoxDecoration(
-              color: darkModeEnabled
-                  ? const Color(0xFF334155)
-                  : const Color(0xFFF1F5F9),
-
-              borderRadius: BorderRadius.circular(10),
-            ),
-
-            child: Icon(
-              icon,
-              size: 20,
-              color: darkModeEnabled ? Colors.white : const Color(0xFF475569),
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-
-              children: [
-                Text(
-                  title,
-
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: darkModeEnabled
-                        ? Colors.white
-                        : const Color(0xFF0F172A),
-                  ),
-                ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  subtitle,
-
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: darkModeEnabled
-                        ? const Color(0xFFCBD5E1)
-                        : const Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: const Color(0xFF2563EB),
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusLg),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: AppTheme.danger, size: 20),
+            SizedBox(width: 8),
+            Text('Log Out?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: const Text('Are you sure you want to log out of TaskForge?', style: TextStyle(fontSize: 13)),
+        actions: [
+          OutlinedButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger, foregroundColor: Colors.white),
+            child: const Text('Log Out'),
           ),
         ],
       ),
     );
   }
 
-  // =========================================================
-  // PROFILE DIALOG
-  // =========================================================
-
-  Future<void> _openProfileDialog() async {
-    final nameController = TextEditingController(text: userName);
-
-    final emailController = TextEditingController(text: userEmail);
-
-    final formKey = GlobalKey<FormState>();
-
-    await showDialog(
-      context: context,
-
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-
-          title: const Text(
-            'Edit Profile',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-
-          content: Form(
-            key: formKey,
-
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-
-              children: [
-                TextFormField(
-                  controller: nameController,
-
-                  decoration: InputDecoration(
-                    labelText: 'Name',
-                    prefixIcon: const Icon(Icons.person_outline),
-
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Enter your name';
-                    }
-
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 15),
-
-                TextFormField(
-                  controller: emailController,
-
-                  keyboardType: TextInputType.emailAddress,
-
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: const Icon(Icons.email_outlined),
-
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Enter your email';
-                    }
-
-                    if (!value.contains('@')) {
-                      return 'Enter a valid email';
-                    }
-
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-
-              child: const Text('Cancel'),
-            ),
-
-            ElevatedButton.icon(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) {
-                  return;
-                }
-
-                setState(() {
-                  userName = nameController.text.trim();
-
-                  userEmail = emailController.text.trim();
-                });
-
-                Navigator.pop(dialogContext);
-
-                _showMessage('Profile updated successfully!');
-              },
-
-              icon: const Icon(Icons.save_outlined),
-
-              label: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-
-    nameController.dispose();
-    emailController.dispose();
-  }
-
-  // =========================================================
-  // CHANGE PASSWORD
-  // =========================================================
-
-  Future<void> _openChangePasswordDialog() async {
-    final currentController = TextEditingController();
-
-    final newController = TextEditingController();
-
-    final confirmController = TextEditingController();
-
-    final formKey = GlobalKey<FormState>();
-
-    await showDialog(
-      context: context,
-
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-
-          title: const Text(
-            'Change Password',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-
-          content: Form(
-            key: formKey,
-
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-
-                children: [
-                  TextFormField(
-                    controller: currentController,
-
-                    obscureText: true,
-
-                    decoration: InputDecoration(
-                      labelText: 'Current Password',
-
-                      prefixIcon: const Icon(Icons.lock_outline),
-
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Enter current password';
-                      }
-
-                      if (value != currentPassword) {
-                        return 'Current password is incorrect';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  TextFormField(
-                    controller: newController,
-
-                    obscureText: true,
-
-                    decoration: InputDecoration(
-                      labelText: 'New Password',
-
-                      prefixIcon: const Icon(Icons.lock_reset),
-
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Enter new password';
-                      }
-
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  TextFormField(
-                    controller: confirmController,
-
-                    obscureText: true,
-
-                    decoration: InputDecoration(
-                      labelText: 'Confirm Password',
-
-                      prefixIcon: const Icon(Icons.lock_outline),
-
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Confirm your password';
-                      }
-
-                      if (value != newController.text) {
-                        return 'Passwords do not match';
-                      }
-
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-
-              child: const Text('Cancel'),
-            ),
-
-            ElevatedButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) {
-                  return;
-                }
-
-                setState(() {
-                  currentPassword = newController.text;
-                });
-
-                Navigator.pop(dialogContext);
-
-                _showMessage('Password changed successfully!');
-              },
-
-              child: const Text('Update Password'),
-            ),
-          ],
-        );
-      },
-    );
-
-    currentController.dispose();
-    newController.dispose();
-    confirmController.dispose();
-  }
-
-  // =========================================================
-  // ABOUT TASKFORGE
-  // =========================================================
-
-  void _showAboutDialog() {
-    showDialog(
-      context: context,
-
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-
-          title: const Row(
-            children: [
-              Icon(Icons.task_alt, color: Color(0xFF2563EB)),
-
-              SizedBox(width: 10),
-
-              Text('TaskForge', style: TextStyle(fontWeight: FontWeight.bold)),
-            ],
-          ),
-
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-
-            crossAxisAlignment: CrossAxisAlignment.start,
-
-            children: [
-              Text(
-                'TaskForge is a task and project '
-                'management application built with Flutter.',
-              ),
-
-              SizedBox(height: 15),
-
-              Text(
-                'Version: 1.0.0',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-
-              SizedBox(height: 5),
-
-              Text('Flutter Frontend Project'),
-            ],
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // =========================================================
-  // HELP & SUPPORT
-  // =========================================================
-
-  void _showHelpDialog() {
-    showDialog(
-      context: context,
-
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-
-          title: const Row(
-            children: [
-              Icon(Icons.help_outline, color: Color(0xFF2563EB)),
-
-              SizedBox(width: 10),
-
-              Text(
-                'Help & Support',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-
-            crossAxisAlignment: CrossAxisAlignment.start,
-
-            children: [
-              Text(
-                'TaskForge Help',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-
-              SizedBox(height: 10),
-
-              Text(
-                '• Create and manage tasks\n'
-                '• Create and manage projects\n'
-                '• Edit and delete projects\n'
-                '• Track task progress\n'
-                '• Manage your profile\n'
-                '• Change your password\n'
-                '• Enable or disable notifications',
-              ),
-            ],
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // =========================================================
-  // LOGOUT
-  // =========================================================
-
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-
-          title: const Row(
-            children: [
-              Icon(Icons.logout, color: Colors.red),
-
-              SizedBox(width: 10),
-
-              Text('Logout?', style: TextStyle(fontWeight: FontWeight.bold)),
-            ],
-          ),
-
-          content: const Text('Are you sure you want to logout?'),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-
-              child: const Text('Cancel'),
-            ),
-
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-
-                // Return to the first screen.
-                // This will normally be your Login/Splash
-                // depending on how main.dart is configured.
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-
-              icon: const Icon(Icons.logout),
-
-              label: const Text('Logout'),
-
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // =========================================================
-  // SNACKBAR
-  // =========================================================
-
-  void _showMessage(String message) {
+  void _showMessage(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+      SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
     );
   }
 }

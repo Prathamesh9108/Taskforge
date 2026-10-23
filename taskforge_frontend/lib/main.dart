@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/splash_screen.dart';
+import 'theme/app_theme.dart';
 
 class ThemeController {
   static final ValueNotifier<bool> isDarkMode = ValueNotifier<bool>(false);
@@ -23,24 +24,9 @@ class TaskForgeApp extends StatelessWidget {
           title: 'TaskForge',
 
           // ============================
-          // LIGHT THEME
+          // LIGHT THEME (TaskForge SaaS Design System)
           // ============================
-          theme: ThemeData(
-            useMaterial3: true,
-
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF2563EB),
-              brightness: Brightness.light,
-            ),
-
-            scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Colors.white,
-              foregroundColor: Color(0xFF0F172A),
-              elevation: 0,
-            ),
-          ),
+          theme: AppTheme.lightTheme,
 
           // ============================
           // DARK THEME

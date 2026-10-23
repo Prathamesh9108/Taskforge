@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -9,7 +10,6 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final TextEditingController emailController = TextEditingController();
 
   @override
@@ -25,216 +25,134 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Reset link sent successfully!'),
-        backgroundColor: Colors.green,
+        content: Text('Reset instructions sent to your email.'),
+        backgroundColor: AppTheme.success,
       ),
     );
+
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-
-        leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-        ),
+        title: const Text('Reset Password'),
       ),
-
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 450),
-
-              child: Form(
-                key: _formKey,
-
-                child: Column(
-                  children: [
-                    // =========================
-                    // ICON
-                    // =========================
-
-                    Container(
-                      width: 90,
-                      height: 90,
-
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(25),
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Container(
+                padding: const EdgeInsets.all(AppTheme.space20),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: AppTheme.radiusLg,
+                  border: Border.all(color: AppTheme.cardBorder),
+                  boxShadow: AppTheme.cardShadow,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppTheme.primary, AppTheme.accentViolet],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: AppTheme.radiusMd,
+                          ),
+                          child: const Icon(
+                            Icons.lock_reset_rounded,
+                            size: 26,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
-
-                      child: const Icon(
-                        Icons.lock_reset,
-                        size: 48,
-                        color: Color(0xFF2563EB),
+                      const SizedBox(height: 16),
+                      const Center(
+                        child: Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimary,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
                       ),
-                    ),
-
-                    const SizedBox(height: 28),
-
-                    // =========================
-                    // TITLE
-                    // =========================
-                    const Text(
-                      'Forgot Password?',
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
+                      const SizedBox(height: 4),
+                      const Center(
+                        child: Text(
+                          'Enter your registered email and we will send password reset instructions.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        ),
                       ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    const Text(
-                      'No worries! Enter your email address and '
-                      'we will help you reset your password.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Color(0xFF64748B),
-                        height: 1.5,
-                      ),
-                    ),
-
-                    const SizedBox(height: 40),
-
-                    // =========================
-                    // EMAIL LABEL
-                    // =========================
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
+                      const SizedBox(height: 20),
+                      const Text(
                         'Email Address',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF334155),
+                          color: AppTheme.textPrimary,
                         ),
                       ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // =========================
-                    // EMAIL FIELD
-                    // =========================
-                    TextFormField(
-                      controller: emailController,
-
-                      keyboardType: TextInputType.emailAddress,
-
-                      decoration: InputDecoration(
-                        hintText: 'Enter your registered email',
-
-                        prefixIcon: const Icon(Icons.email_outlined),
-
-                        filled: true,
-                        fillColor: Colors.white,
-
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: emailController,
+                        style: const TextStyle(fontSize: 13),
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          hintText: 'alex@company.com',
+                          prefixIcon: Icon(Icons.email_outlined, size: 17, color: AppTheme.textMuted),
                         ),
-
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter your email';
+                          }
+                          if (!value.contains('@')) {
+                            return 'Please enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 42,
+                        child: ElevatedButton(
+                          onPressed: sendResetLink,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusMd),
                           ),
-                        ),
-
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF2563EB),
-                            width: 2,
-                          ),
+                          child: const Text('Send Reset Link', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
                         ),
                       ),
-
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your email';
-                        }
-
-                        final emailRegex = RegExp(
-                          r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                        );
-
-                        if (!emailRegex.hasMatch(value.trim())) {
-                          return 'Please enter a valid email';
-                        }
-
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 28),
-
-                    // =========================
-                    // SEND BUTTON
-                    // =========================
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-
-                      child: ElevatedButton(
-                        onPressed: sendResetLink,
-
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-
-                          foregroundColor: Colors.white,
-
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-
-                          elevation: 0,
-                        ),
-
-                        child: const Text(
-                          'SEND RESET LINK',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      const SizedBox(height: 14),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Back to Sign In', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                         ),
                       ),
-                    ),
-
-                    const SizedBox(height: 25),
-
-                    // =========================
-                    // BACK TO LOGIN
-                    // =========================
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-
-                      child: const Text(
-                        'Back to Login',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

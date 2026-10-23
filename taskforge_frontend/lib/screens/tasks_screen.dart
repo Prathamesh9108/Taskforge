@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
-
+import '../Services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/responsive_scaffold.dart';
+import '../widgets/status_badge.dart';
+import '../widgets/priority_badge.dart';
+import '../widgets/interactive_card.dart';
+import '../widgets/empty_state.dart';
 import 'task_details_screen.dart';
 import 'add_task_screen.dart';
-import '../services/api_service.dart';
+import 'kanban_board_screen.dart';
 
 class TasksScreen extends StatefulWidget {
-  const TasksScreen({super.key});
+  final String? initialStatus;
+  final bool initialKanbanView;
+
+  const TasksScreen({
+    super.key,
+    this.initialStatus,
+    this.initialKanbanView = false,
+  });
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -13,67 +26,24 @@ class TasksScreen extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreen> {
   final TextEditingController searchController = TextEditingController();
-  String selectedStatus = 'All';
-  String selectedPriority = 'All';
-  String selectedSort = 'Newest';
 
   List<Map<String, dynamic>> allTasks = [];
   bool isLoading = true;
   String? errorMessage;
+
+  late String selectedStatus;
+  String selectedPriority = 'All';
+  String selectedProject = 'All';
+
+  final List<String> statusFilters = const ['All', 'To Do', 'In Progress', 'Done'];
+  final List<String> priorityFilters = const ['All', 'High', 'Medium', 'Low'];
+  List<String> projectFilters = ['All'];
+
   @override
   void initState() {
     super.initState();
+    selectedStatus = widget.initialStatus ?? 'All';
     _loadTasks();
-  }
-
-  Future<void> _loadTasks() async {
-    try {
-      final data = await ApiService.getTasks();
-
-      setState(() {
-        allTasks = data.map<Map<String, dynamic>>((task) {
-          return {
-            'id': task['id'],
-            'title': task['title'] ?? '',
-            'description': task['description'] ?? '',
-            'priority': _formatPriority(task['priority']),
-            'status': _formatStatus(task['status']),
-            'dueDate': task['dueDate'] ?? 'No due date',
-          };
-        }).toList();
-
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = e.toString();
-      });
-    }
-  }
-
-  String _formatStatus(String? status) {
-    if (status == 'TODO') {
-      return 'To Do';
-    }
-
-    if (status == 'IN_PROGRESS') {
-      return 'In Progress';
-    }
-
-    if (status == 'DONE') {
-      return 'Done';
-    }
-
-    return status ?? 'To Do';
-  }
-
-  String _formatPriority(String? priority) {
-    if (priority == 'HIGH') return 'High';
-    if (priority == 'MEDIUM') return 'Medium';
-    if (priority == 'LOW') return 'Low';
-
-    return priority ?? 'Low';
   }
 
   @override
@@ -82,579 +52,743 @@ class _TasksScreenState extends State<TasksScreen> {
     super.dispose();
   }
 
-  List<Map<String, dynamic>> get filteredTasks {
-    List<Map<String, dynamic>> result = List.from(allTasks);
+  Future<void> _loadTasks() async {
+    try {
+      final data = await ApiService.getTasks();
+      if (!mounted) return;
 
-    // SEARCH
-    final search = searchController.text.toLowerCase().trim();
+      setState(() {
+        allTasks = data.map<Map<String, dynamic>>((task) {
+          return {
+            'id': task['id'],
+            'title': task['title'] ?? 'Task',
+            'description': task['description'] ?? '',
+            'priority': _formatPriority(task['priority']),
+            'status': _formatStatus(task['status']),
+            'dueDate': task['dueDate'] ?? 'No due date',
+            'project': task['project']?['name'] ?? 'General',
+            'projectId': task['project']?['id'],
+          };
+        }).toList();
 
-    if (search.isNotEmpty) {
-      result = result.where((task) {
-        return task['title'].toString().toLowerCase().contains(search) ||
-            task['description'].toString().toLowerCase().contains(search);
-      }).toList();
+        final names = <String>{};
+        for (var t in allTasks) {
+          final p = t['project']?.toString();
+          if (p != null && p.isNotEmpty) names.add(p);
+        }
+        projectFilters = ['All', ...names];
+
+        isLoading = false;
+        errorMessage = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+        errorMessage = e.toString();
+      });
     }
+  }
 
-    // STATUS FILTER
-    if (selectedStatus != 'All') {
-      result = result
-          .where((task) => task['status'] == selectedStatus)
-          .toList();
+  String _formatStatus(String? status) {
+    final s = (status ?? '').toUpperCase().replaceAll(' ', '_');
+    if (s == 'DONE' || s == 'COMPLETED') return 'Done';
+    if (s == 'IN_PROGRESS') return 'In Progress';
+    return 'To Do';
+  }
+
+  String _formatPriority(String? priority) {
+    final p = (priority ?? '').toUpperCase();
+    if (p == 'HIGH') return 'High';
+    if (p == 'LOW') return 'Low';
+    return 'Medium';
+  }
+
+  Future<void> _openAddTask() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AddTaskScreen(),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _loadTasks();
     }
-
-    // PRIORITY FILTER
-    if (selectedPriority != 'All') {
-      result = result
-          .where((task) => task['priority'] == selectedPriority)
-          .toList();
-    }
-
-    return result;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final tasks = filteredTasks;
+  Future<void> _toggleTaskStatus(Map<String, dynamic> task) async {
+    final int taskId = (task['id'] as num).toInt();
+    final currentStatus = task['status'];
+    final nextStatus = currentStatus == 'Done'
+        ? 'To Do'
+        : currentStatus == 'To Do'
+            ? 'In Progress'
+            : 'Done';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+    final backendStatus = nextStatus == 'Done'
+        ? 'DONE'
+        : nextStatus == 'In Progress'
+            ? 'IN_PROGRESS'
+            : 'TODO';
 
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+    setState(() {
+      task['status'] = nextStatus;
+    });
 
-        title: const Text(
-          'Tasks',
-          style: TextStyle(
-            color: Color(0xFF0F172A),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-
-        actions: [
-          IconButton(
-            onPressed: _showFilterSheet,
-            icon: const Icon(Icons.filter_list, color: Color(0xFF334155)),
-          ),
-        ],
-      ),
-
-      body: Column(
-        children: [
-          // SEARCH
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-
-            child: TextField(
-              controller: searchController,
-
-              onChanged: (_) {
-                setState(() {});
-              },
-
-              decoration: InputDecoration(
-                hintText: 'Search tasks...',
-
-                prefixIcon: const Icon(Icons.search),
-
-                suffixIcon: searchController.text.isNotEmpty
-                    ? IconButton(
-                        onPressed: () {
-                          searchController.clear();
-                          setState(() {});
-                        },
-                        icon: const Icon(Icons.clear),
-                      )
-                    : null,
-
-                filled: true,
-
-                fillColor: Colors.white,
-
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-
-                  borderSide: const BorderSide(color: Color(0xFF2563EB)),
-                ),
-              ),
-            ),
-          ),
-
-          // FILTER CHIPS
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-
-            child: Row(
-              children: [
-                _filterChip('All', selectedStatus == 'All', () {
-                  setState(() {
-                    selectedStatus = 'All';
-                  });
-                }),
-
-                _filterChip('To Do', selectedStatus == 'To Do', () {
-                  setState(() {
-                    selectedStatus = 'To Do';
-                  });
-                }),
-
-                _filterChip('In Progress', selectedStatus == 'In Progress', () {
-                  setState(() {
-                    selectedStatus = 'In Progress';
-                  });
-                }),
-
-                _filterChip('Done', selectedStatus == 'Done', () {
-                  setState(() {
-                    selectedStatus = 'Done';
-                  });
-                }),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // RESULT COUNT + SORT
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-
-            child: Row(
-              children: [
-                Text(
-                  '${tasks.length} task${tasks.length == 1 ? '' : 's'}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-
-                const Spacer(),
-
-                PopupMenuButton<String>(
-                  initialValue: selectedSort,
-
-                  onSelected: (value) {
-                    setState(() {
-                      selectedSort = value;
-                    });
-                  },
-
-                  itemBuilder: (context) {
-                    return const [
-                      PopupMenuItem(value: 'Newest', child: Text('Newest')),
-                      PopupMenuItem(value: 'Oldest', child: Text('Oldest')),
-                      PopupMenuItem(value: 'Priority', child: Text('Priority')),
-                    ];
-                  },
-
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.sort,
-                        size: 18,
-                        color: Color(0xFF475569),
-                      ),
-
-                      const SizedBox(width: 5),
-
-                      Text(
-                        selectedSort,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF475569),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 5),
-
-          // TASK LIST
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : errorMessage != null
-                ? Center(
-                    child: Text(
-                      'Failed to load tasks',
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  )
-                : tasks.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-                    itemCount: tasks.length,
-                    itemBuilder: (context, index) {
-                      return _buildTaskCard(tasks[index]);
-                    },
-                  ),
-          ),
-        ],
-      ),
-
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddTaskScreen()),
-          );
-
-          if (result == true) {
-            await _loadTasks();
-          }
-        },
-        backgroundColor: const Color(0xFF2563EB),
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
-      ),
-    );
+    try {
+      await ApiService.updateTask(taskId, {'status': backendStatus});
+      _loadTasks();
+    } catch (_) {}
   }
 
-  Widget _filterChip(String title, bool selected, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
+  Future<void> _editTask(Map<String, dynamic> task) async {
+    final titleController = TextEditingController(text: task['title'] ?? '');
+    final descriptionController = TextEditingController(text: task['description'] ?? '');
+    String currentStatus = task['status'] ?? 'To Do';
+    String currentPriority = task['priority'] ?? 'Medium';
 
-      child: ChoiceChip(
-        label: Text(title),
-
-        selected: selected,
-
-        onSelected: (_) {
-          onTap();
-        },
-
-        selectedColor: const Color(0xFFDBEAFE),
-
-        labelStyle: TextStyle(
-          color: selected ? const Color(0xFF1D4ED8) : const Color(0xFF475569),
-
-          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-        ),
-
-        backgroundColor: Colors.white,
-
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-    );
-  }
-
-  Widget _buildTaskCard(Map<String, dynamic> task) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TaskDetailsScreen(task: task),
-          ),
-        );
-      },
-
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-
-        padding: const EdgeInsets.all(16),
-
-        decoration: BoxDecoration(
-          color: Colors.white,
-
-          borderRadius: BorderRadius.circular(16),
-
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    task['title'],
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                ),
-
-                _priorityBadge(task['priority']),
-              ],
-            ),
-
-            const SizedBox(height: 7),
-
-            Text(
-              task['description'],
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-
-            const SizedBox(height: 14),
-
-            Row(
-              children: [
-                Icon(
-                  Icons.calendar_today_outlined,
-                  size: 15,
-                  color: const Color(0xFF64748B),
-                ),
-
-                const SizedBox(width: 5),
-
-                Text(
-                  task['dueDate'],
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-
-                const Spacer(),
-
-                _statusBadge(task['status']),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _priorityBadge(String priority) {
-    Color color;
-
-    if (priority == 'High') {
-      color = Colors.red;
-    } else if (priority == 'Medium') {
-      color = Colors.orange;
-    } else {
-      color = Colors.green;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(7),
-      ),
-
-      child: Text(
-        priority,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-    );
-  }
-
-  Widget _statusBadge(String status) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(7),
-      ),
-
-      child: Text(
-        status,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-          color: Color(0xFF475569),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-
-        children: [
-          const Icon(Icons.task_alt, size: 60, color: Color(0xFFCBD5E1)),
-
-          const SizedBox(height: 15),
-
-          const Text(
-            'No tasks found',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0F172A),
-            ),
-          ),
-
-          const SizedBox(height: 6),
-
-          const Text(
-            'Try changing your search or filters.',
-            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showFilterSheet() {
-    showModalBottomSheet(
+    final result = await showDialog<bool>(
       context: context,
-
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
-              padding: const EdgeInsets.all(20),
-
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-
-                crossAxisAlignment: CrossAxisAlignment.start,
-
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusLg),
+              title: const Row(
                 children: [
-                  const Text(
-                    'Filter Tasks',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const Text(
-                    'Status',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Wrap(
-                    spacing: 8,
-
-                    children: ['All', 'To Do', 'In Progress', 'Done'].map((
-                      status,
-                    ) {
-                      return ChoiceChip(
-                        label: Text(status),
-
-                        selected: selectedStatus == status,
-
-                        onSelected: (_) {
-                          setState(() {
-                            selectedStatus = status;
-                          });
-
-                          setSheetState(() {});
-                        },
-                      );
-                    }).toList(),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const Text(
-                    'Priority',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Wrap(
-                    spacing: 8,
-
-                    children: ['All', 'High', 'Medium', 'Low'].map((priority) {
-                      return ChoiceChip(
-                        label: Text(priority),
-
-                        selected: selectedPriority == priority,
-
-                        onSelected: (_) {
-                          setState(() {
-                            selectedPriority = priority;
-                          });
-
-                          setSheetState(() {});
-                        },
-                      );
-                    }).toList(),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-
-                      child: const Text('Apply Filters'),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Center(
-                    child: TextButton(
-                      onPressed: () {
-                        setState(() {
-                          selectedStatus = 'All';
-                          selectedPriority = 'All';
-                        });
-
-                        Navigator.pop(context);
-                      },
-
-                      child: const Text('Clear Filters'),
+                  Icon(Icons.edit_note_rounded, color: AppTheme.primary, size: 22),
+                  SizedBox(width: 8),
+                  Text(
+                    'Edit Task',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
                     ),
                   ),
                 ],
               ),
+              content: SizedBox(
+                width: 400,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Task Title',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: titleController,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: const InputDecoration(hintText: 'Enter title'),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Description',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: descriptionController,
+                        maxLines: 2,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: const InputDecoration(hintText: 'Enter description'),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Status',
+                                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 6),
+                                DropdownButtonFormField<String>(
+                                  initialValue: currentStatus,
+                                  items: const [
+                                    DropdownMenuItem(value: 'To Do', child: Text('To Do')),
+                                    DropdownMenuItem(value: 'In Progress', child: Text('In Progress')),
+                                    DropdownMenuItem(value: 'Done', child: Text('Done')),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setDialogState(() => currentStatus = val);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Priority',
+                                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 6),
+                                DropdownButtonFormField<String>(
+                                  initialValue: currentPriority,
+                                  items: const [
+                                    DropdownMenuItem(value: 'High', child: Text('High')),
+                                    DropdownMenuItem(value: 'Medium', child: Text('Medium')),
+                                    DropdownMenuItem(value: 'Low', child: Text('Low')),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setDialogState(() => currentPriority = val);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Save'),
+                ),
+              ],
             );
           },
         );
       },
+    );
+
+    if (result == true && mounted) {
+      final int taskId = (task['id'] as num).toInt();
+      final backendStatus = currentStatus == 'Done'
+          ? 'DONE'
+          : currentStatus == 'In Progress'
+              ? 'IN_PROGRESS'
+              : 'TODO';
+
+      try {
+        await ApiService.updateTask(taskId, {
+          'title': titleController.text.trim(),
+          'description': descriptionController.text.trim(),
+          'status': backendStatus,
+          'priority': currentPriority.toUpperCase(),
+        });
+        await _loadTasks();
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Task updated successfully'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e'), backgroundColor: AppTheme.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteTask(int taskId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surface,
+          shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusLg),
+          title: const Row(
+            children: [
+              Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Delete Task?',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to delete this task? This cannot be undone.',
+            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+          ),
+          actions: [
+            OutlinedButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.danger,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await ApiService.deleteTask(taskId);
+        await _loadTasks();
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Task deleted successfully'),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete: $e'), backgroundColor: AppTheme.danger),
+        );
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> _filteredTasks() {
+    return allTasks.where((t) {
+      final title = (t['title'] ?? '').toString().toLowerCase();
+      final project = (t['project'] ?? '').toString().toLowerCase();
+      final desc = (t['description'] ?? '').toString().toLowerCase();
+
+      // Status Filter
+      if (selectedStatus != 'All' && t['status'] != selectedStatus) {
+        return false;
+      }
+
+      // Priority Filter
+      if (selectedPriority != 'All' && t['priority'] != selectedPriority) {
+        return false;
+      }
+
+      // Project Filter
+      if (selectedProject != 'All' && t['project'] != selectedProject) {
+        return false;
+      }
+
+      // Search
+      final query = searchController.text.trim().toLowerCase();
+      if (query.isNotEmpty) {
+        return title.contains(query) || project.contains(query) || desc.contains(query);
+      }
+
+      return true;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredTasks();
+
+    return ResponsiveScaffold(
+      selectedIndex: 2,
+      title: 'Tasks',
+      subtitle: '${allTasks.length} tasks in workspace',
+      onRefresh: _loadTasks,
+      topBarActions: [
+        IconButton(
+          tooltip: 'Switch to Kanban Board',
+          icon: const Icon(Icons.view_kanban_outlined, size: 20, color: AppTheme.textSecondary),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const KanbanBoardScreen()),
+            );
+          },
+        ),
+        IconButton(
+          tooltip: 'Add Task',
+          icon: const Icon(Icons.add_task_rounded, size: 20, color: AppTheme.primary),
+          onPressed: _openAddTask,
+        ),
+      ],
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Add Task',
+        backgroundColor: AppTheme.primary,
+        foregroundColor: Colors.white,
+        elevation: 2,
+        mini: true,
+        onPressed: _openAddTask,
+        child: const Icon(Icons.add, size: 20),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadTasks,
+        color: AppTheme.primary,
+        child: Column(
+          children: [
+            // ==========================================
+            // SEARCH & FILTER CONTROLS
+            // ==========================================
+            Container(
+              color: AppTheme.surface,
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+              child: Column(
+                children: [
+                  // Search Bar
+                  SizedBox(
+                    height: 38,
+                    child: TextField(
+                      controller: searchController,
+                      style: const TextStyle(fontSize: 13),
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Search tasks or projects...',
+                        prefixIcon: const Icon(Icons.search, size: 17, color: AppTheme.textMuted),
+                        suffixIcon: searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 16, color: AppTheme.textMuted),
+                                onPressed: () {
+                                  searchController.clear();
+                                  setState(() {});
+                                },
+                              )
+                            : null,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                        fillColor: AppTheme.background,
+                        filled: true,
+                        border: OutlineInputBorder(
+                          borderRadius: AppTheme.radiusMd,
+                          borderSide: const BorderSide(color: AppTheme.cardBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: AppTheme.radiusMd,
+                          borderSide: const BorderSide(color: AppTheme.cardBorder),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: AppTheme.radiusMd,
+                          borderSide: const BorderSide(color: AppTheme.primary),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Filter Chips (Status & Priority in compact row)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // Status Filter Chips
+                        ...statusFilters.map((s) {
+                          final isSel = selectedStatus == s;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: InkWell(
+                              onTap: () => setState(() => selectedStatus = s),
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isSel ? AppTheme.primary : AppTheme.background,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSel ? AppTheme.primary : AppTheme.cardBorder,
+                                  ),
+                                ),
+                                child: Text(
+                                  s,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                                    color: isSel ? Colors.white : AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+
+                        Container(
+                          height: 16,
+                          width: 1,
+                          color: AppTheme.divider,
+                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                        ),
+
+                        // Priority Filter Chips
+                        ...priorityFilters.map((p) {
+                          final isSel = selectedPriority == p;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: InkWell(
+                              onTap: () => setState(() => selectedPriority = p),
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isSel ? AppTheme.surfaceSubtle : AppTheme.background,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSel ? AppTheme.primary : AppTheme.cardBorder,
+                                  ),
+                                ),
+                                child: Text(
+                                  p == 'All' ? 'All Priority' : p,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                                    color: isSel ? AppTheme.primary : AppTheme.textMuted,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+
+                        if (projectFilters.length > 2) ...[
+                          Container(
+                            height: 16,
+                            width: 1,
+                            color: AppTheme.divider,
+                            margin: const EdgeInsets.symmetric(horizontal: 6),
+                          ),
+                          Container(
+                            height: 26,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: selectedProject != 'All' ? AppTheme.primaryLight : AppTheme.background,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: selectedProject != 'All' ? AppTheme.primary : AppTheme.cardBorder,
+                              ),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: projectFilters.contains(selectedProject) ? selectedProject : 'All',
+                                icon: const Icon(Icons.arrow_drop_down, size: 14, color: AppTheme.textMuted),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: selectedProject != 'All' ? FontWeight.w700 : FontWeight.w500,
+                                  color: selectedProject != 'All' ? AppTheme.primary : AppTheme.textSecondary,
+                                ),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => selectedProject = val);
+                                },
+                                items: projectFilters.map((p) {
+                                  return DropdownMenuItem(
+                                    value: p,
+                                    child: Text(p == 'All' ? 'All Projects' : p),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 1),
+
+            // ==========================================
+            // COMPACT TASK LIST
+            // ==========================================
+            Expanded(
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                  : filtered.isEmpty
+                      ? EmptyState(
+                          icon: Icons.task_alt_rounded,
+                          title: 'No Tasks Found',
+                          message: searchController.text.isNotEmpty
+                              ? 'No tasks match "${searchController.text}".'
+                              : 'Try changing your filters or add a new task.',
+                          actionLabel: searchController.text.isNotEmpty ? 'Clear Search' : 'Add Task',
+                          onAction: searchController.text.isNotEmpty
+                              ? () {
+                                  searchController.clear();
+                                  setState(() {});
+                                }
+                              : _openAddTask,
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppTheme.space16,
+                            AppTheme.space12,
+                            AppTheme.space16,
+                            76,
+                          ),
+                          itemCount: filtered.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final task = filtered[index];
+                            final isDone = task['status'] == 'Done';
+                            final taskId = (task['id'] as num).toInt();
+
+                            return InteractiveCard(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              borderRadius: AppTheme.radiusLg,
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TaskDetailsScreen(task: task),
+                                  ),
+                                );
+                                _loadTasks();
+                              },
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Quick toggle circle
+                                  InkWell(
+                                    onTap: () => _toggleTaskStatus(task),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(2),
+                                      child: Icon(
+                                        isDone
+                                            ? Icons.check_circle_rounded
+                                            : Icons.radio_button_unchecked_rounded,
+                                        size: 19,
+                                        color: isDone ? AppTheme.success : AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+
+                                  // Task Title + Project Name
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          task['title'] ?? 'Task',
+                                          style: TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDone ? AppTheme.textMuted : AppTheme.textPrimary,
+                                            decoration: isDone ? TextDecoration.lineThrough : null,
+                                            letterSpacing: -0.1,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.folder_outlined,
+                                              size: 11,
+                                              color: AppTheme.textMuted,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              task['project'] ?? 'General',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: AppTheme.textSecondary,
+                                              ),
+                                            ),
+                                            if (task['dueDate'] != null && task['dueDate'] != 'No due date') ...[
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                '• ${task['dueDate']}',
+                                                style: const TextStyle(
+                                                  fontSize: 10.5,
+                                                  color: AppTheme.textMuted,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+
+                                  // Priority Badge
+                                  PriorityBadge(
+                                    priority: task['priority'] ?? 'Medium',
+                                    fontSize: 10,
+                                  ),
+                                  const SizedBox(width: 6),
+
+                                  // Status Badge
+                                  StatusBadge(
+                                    status: task['status'] ?? 'To Do',
+                                    fontSize: 10,
+                                  ),
+                                  const SizedBox(width: 4),
+
+                                  // Edit & Delete actions
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(
+                                      Icons.more_vert,
+                                      size: 17,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 120),
+                                    onSelected: (val) {
+                                      if (val == 'edit') _editTask(task);
+                                      if (val == 'delete') _deleteTask(taskId);
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        height: 34,
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit_outlined, size: 15, color: AppTheme.textSecondary),
+                                            SizedBox(width: 8),
+                                            Text('Edit', style: TextStyle(fontSize: 12)),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        height: 34,
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete_outline, size: 15, color: AppTheme.danger),
+                                            SizedBox(width: 8),
+                                            Text('Delete', style: TextStyle(fontSize: 12, color: AppTheme.danger)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
